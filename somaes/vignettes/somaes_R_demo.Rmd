@@ -1,0 +1,463 @@
+---
+title: "Proyecto Final - R - Software matemático y estadístico"
+author: "Kevin Cook"
+date: "2024-11-03"
+output: 
+  html_document: default
+  pdf_document: default
+vignette: >
+  %\VignetteIndexEntry{Proyecto Final - R - Software matemático y estadístico}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+library(somaes)
+library(knitr)
+library(ggplot2)
+library(pheatmap)
+```
+
+## Introduction
+
+*Atención: este vignette para R contiene las mismas demostraciones que el 
+notebook principal SoMaEs_Projecto_Final_R_Kevin_Cook_v37.Rmd, pero con las 
+funciones y datasets movidos a un paquete instalable (somaes).*
+
+R es un lenguaje de programación al que no estuve acostumbrado antes de 
+empezar el programa KISA--el primer mes del máster se me hizo cuesta arriba. 
+Tanto el lenguaje en sí como el entorno de RStudio me resultaban extraños, 
+hasta que empecé a darme cuenta de que R requiere que tengas una mentalidad 
+similar a la de MATLAB (en el sentido de que tienes que intentar descomponer 
+todo lo que puedas en operaciones matriciales), y que el IDE de RStudio es 
+realmente la mejor forma de experimentar con funciones y desarrollar código. 
+Después de terminar Advanced Statisical Modeling, realmente empecé a apreciar 
+el poder de la plataforma y todas las características y paquetes disponibles 
+uno él. Knitr es un gran ejemplo, este documento generado con él, comprende el 
+principal documento que demuestra mis implementaciones de las funciones 
+requeridas en R.
+
+Mi approach para este curso fue desarrollar las implementaciones de las 
+funciones Python y R simultáneamente, o casi. Sentí que esto me permitía 
+enterarme de los puntos fuertes y débiles de cada plataforma, y decidir cuál 
+preferiría utilizar en futuros proyectos en los que tuviera flexibilidad para 
+hacerlo. Las implementaciones de han resultado ser muy similares, con la 
+excepción de un uso intensivo de tuples en Python (que no existen en R), y el 
+tipo de datos categorical explícito en R, que he intentado incluir siempre que 
+he podido. Nótese que he tomado la decisión de diseño de considerar siempre 
+variables integers como datos categoricos (en ambas implementaciones) en 
+cualquier contexto en el que pudieran ser interpretarse como tales. Mi 
+razonamiento para esto fue que las variables integer pueden se pueden 
+convertir en floars si no quiero que sean categóricas. 
+
+## Functions to be Implemented
+
+### Discretization Algorithms
+
+*Algoritmos de discretización para un solo atributo y para un dataset completo (ambas opciones): Igual frecuencia e igual anchura*
+
+```{r Categorize_demo}
+
+# Example usage of the categorize function with cut points and factor names
+cut_points <- c(1.608, 2.718, 3.142)
+create_factor_names(cut_points)
+```
+
+#### Equal-width and equal-frequency discretization algorithms, vector versions
+
+```{r Discretization_vector_versions__discretizationEW_demo}
+
+# Test discretizeEW()
+p03_disc_values
+p03_disc_bins
+result_ew <- discretizeEW(p03_disc_values, p03_disc_bins)
+result_ew$discretized
+result_ew$cut_points
+
+# Test discretizeEF()
+result_ef <- discretizeEF(p03_disc_values, p03_disc_bins)
+result_ef$discretized
+result_ef$cut_points
+
+# Test discretizeEF() on larger example vector
+random_values <- runif(50, min = 0.0, max = 25.0)
+num_cut <- 7
+result_random <- discretizeEW(random_values, num_cut)
+result_random$discretized
+result_random$cut_points
+```
+
+``` {r Discretization_dataframe_versions__function_demos_1}
+
+num_rows <- 10
+num_bins <- 8
+disc_df_test_df <- data.frame(
+  A = sample(1:100,  size=num_rows, replace=TRUE),
+  B = sample(1:200,  size=num_rows, replace=TRUE),
+  C = sample(50:300, size=num_rows, replace=TRUE)
+)
+
+# discretize_EW_by_column()
+disc_df_ew_df1 <- discretize_EW_by_column(disc_df_test_df, num_bins)
+kable(disc_df_ew_df1, caption="discretize_EW_by_column()\\label{tab:discretize_EW_by_column}")
+
+```
+
+``` {r Discretization_dataframe_versions__function_demos_2}
+
+# discretize_EW_by_column() keeping original columns
+disc_df_ew_df2 <- discretize_EW_by_column(disc_df_test_df, num_bins, keep_original=T)
+kable(disc_df_ew_df2, caption="discretize_EW_by_column() with original\\label{tab:discretize_EW_by_column_original}")
+```
+
+``` {r Discretization_dataframe_versions__function_demos_3}
+
+# discretize_EF_by_column()
+disc_df_ef_df1 <- discretize_EF_by_column(disc_df_test_df, num_bins)
+kable(disc_df_ew_df1, caption="discretize_EF_by_column()\\label{tab:discretize_EF_by_column}")
+
+```
+
+``` {r Discretization_dataframe_versions__function_demos_4}
+
+# discretize_EF_by_column() keeping original columns
+disc_df_ef_df2 <- discretize_EF_by_column(disc_df_test_df, num_bins, keep_original=T)
+kable(disc_df_ew_df1, caption="discretize_EF_by_column() with original\\label{tab:discretize_EF_by_column_original}")
+
+```
+
+``` {r Discretization_dataframe_versions__function_demos_5}
+# discretize_EW_EF_by_column()
+first_two <- subset(disc_df_test_df, select=c(1,2))
+disc_df_ew_ef_df1 <- discretize_EW_EF_by_column(first_two, num_bins)
+kable(disc_df_ew_ef_df1, caption="First six columns of discretize_EW_EF_by_column() \\label{tab:discretize_EW_EF_by_column}")
+
+```
+
+
+### Calculation of metrics for the attributes of a dataset
+
+*Cálculo de métricas para los atributos de un dataset: Varianza y AUC para las variables contínuas y entropía para las discretas. La función deberá reconocer el tipo de atributo y actuar en consecuencia. Notese que en el caso del AUC, el dataset debe ser supervisado, es decir, es necesario especificar una variable clase binaria con la que evaluar el AUC de los atributos numéricos.*
+
+#### Calculation of sample and population variance by column from a dataframe
+
+```{r Calculation_of_metrics_helper_functions__calculate_variance_demos1}
+
+#### Calculating sample variance from dataset of known sample variance=23.5
+sample_variance_23p5_df
+calculate_variance(sample_variance_23p5_df)
+
+#### Calculating population variance from dataset of known sample variance=2.917
+calculate_variance(pop_variance_2p917_df, sample=FALSE)
+
+num_rows <- 10
+variance_df_test_df <- data.frame(
+    A = sample(1:100,  size=num_rows,  replace=TRUE),
+    B = sample(1:200,  size=num_rows,  replace=TRUE),
+    C = sample(50:300, size=num_rows, replace=TRUE)
+)
+
+#### Testing calculate_variance() with random data, multiple columns
+kable(head(variance_df_test_df), caption="Variance DataFrame Preview")
+calculate_variance(variance_df_test_df)
+```
+
+#### ROC (AUC) calculation from two-column dataframe
+
+```{r Calculation_of_metrics_helper_functions__calculate_roc_auc_demos}
+
+#### Testing calculate_roc_auc() with dataframe with known auc=1.0
+roc1 <- calculate_roc_auc(auc_1p0_df)
+roc1$fpr
+roc1$tpr
+roc1$auc
+
+#### Testing calculate_roc_auc() with dataframe with known auc=0.75
+roc2 <- calculate_roc_auc(auc_0p75_df)
+roc2$fpr
+roc2$tpr
+roc2$auc
+```
+
+```{r Calculation_of_metrics_helper_functions__calculate_entropy__function_demos_1}
+
+#### Testing calculate_entropy() with dataframe by column, varying types, known entropy=0.971
+calculate_entropy(data.frame(data=p03_entropy_0p971))
+
+#### Testing calculate_entropy() with dataframe by column, varying types, known entropy=0.971
+multicolumn_entropy_df <- data.frame(
+    letters = c('a', 'a', 'c', 'c', 'c'),
+    integers = c(10, 10, 23, 23, 23),
+    decimals = c(0.5, 0.5, 0.45, 0.45, 0.45)
+)
+
+kable(multicolumn_entropy_df, caption='dataframe by column, varying types for calculate_entropy()\\label{tab:multicolumn_data_for_calculate_entropy}')
+```
+
+```{r Calculation_of_metrics_helper_functions__calculate_entropy__function_demos_2}
+
+for (c in names(multicolumn_entropy_df)) {
+    cat(sprintf('  type: %s\n', c))
+    cat(sprintf('    result: %f\n', 
+                calculate_entropy(multicolumn_entropy_df[c])))
+}
+
+#### Testing calculate_entropy() with zero-length dataframe
+zerolength_entropy_df <- data.frame(zerolength = numeric(0))
+calculate_entropy(zerolength_entropy_df)
+```
+
+##### Testing extract_dataset_metrics() with standard mixed dataframe
+```{r Calculation_of_metrics_helper_functions__extract_dataset_metrics_demos, echo=FALSE, results="hide"}
+
+# no elegant way to do this with lambdas
+unravel <- function(lol) {  # so we'll use a quick explicit function
+    outstring <- ''
+    for (i in seq_along(lol)) {
+        outstring <- paste0(outstring, sprintf("['%s', %s]", 
+                            lol[[i]]$column, round(lol[[i]]$metric, 3)))
+        if (i < length(lol)) { outstring <- paste0(outstring, ", ") }
+    }
+    return(paste0('[', outstring, ']'))
+}
+metrics <- extract_dataset_metrics(std_mixed_df)
+cat(sprintf('  entropy_list: %s\n', unravel(metrics$entropy)))
+cat(sprintf('  variance_list: %s\n', unravel(metrics$variance)))
+cat(sprintf('  auc_list: %s\n', unravel(metrics$auc)))
+kable(std_mixed_df, caption='Standard mixed dataframe used to test extract_dataset_metrics()\\label{tab:multicolumn_data_for_extract_dataset_metrics}')
+```
+
+
+``` {r dataset_metrics_summary__function_demos_1}
+
+kable(std_mixed_df, caption='Standard mixed dataframe \\label{tab:multicolumn_data_for_dataset_metrics_summary}')
+```
+
+``` {r dataset_metrics_summary__function_demos_2}
+
+#### Testing dataset_metrics_summary() with standard mixed dataframe, display_precision=6
+met_summ_df1 = dataset_metrics_summary(std_mixed_df, display_precision=6)
+kable(met_summ_df1, caption='Summary dataframe created by dataset_metrics_summary(), display_precision=6\\label{tab:dataset_metrics_summary_output1}')
+```
+
+``` {r dataset_metrics_summary__function_demos_3}
+
+#### Testing dataset_metrics_summary() with standard mixed dataframe, appending input
+met_summ_df2 = dataset_metrics_summary(std_mixed_df, append_input=TRUE)
+kable(met_summ_df2, caption='Summary dataframe created by dataset_metrics_summary(), appending input\\label{tab:dataset_metrics_summary_output2}')
+```
+
+### Normalization and standardization of variables
+
+*Normalización y estandarización de variables, tanto de manera individual como para el dataset completo. Esto solo debe ser aplicado a atributos que sean numéricos.*
+
+#### Example numeric dataframe
+
+``` {r normalization_standardization__function_demos_1, echo=FALSE}
+
+numeric_nrmn_stdn_df <- data.frame(
+    A = c(5, 4, 3, 2, 1),
+    B = c(10, 20, 30, 40, 50),
+    C = c(5, 4, 3, 2, 1)
+)  
+kable(numeric_nrmn_stdn_df, caption='Example numeric dataframe\\label{tab:normalization_standardization__numeric_nrmn_stdn_df}')
+```
+
+#### Normalize dataframe by column 
+
+``` {r normalization_standardization__function_demos_2}
+
+normalized_df <- normalize_by_column(numeric_nrmn_stdn_df)
+kable(normalized_df, caption='Example numeric dataframe normalized by normalize_by_column\\label{tab:normalization_output1}')
+```
+
+#### Standardize dataframe by column 
+
+``` {r normalization_standardization__function_demos_3}
+
+    standardized_df <- standardize_by_column(numeric_nrmn_stdn_df)
+    kable(standardized_df, caption='Example numeric dataframe standardized by standardize_by_column\\label{tab:standardization_output1}')
+```
+
+
+### Filtering of variables based on the implemented metrics 
+
+*Filtrado de variables en base a las métricas implementadas. Es decir, partiendo de un dataset, obtener uno nuevo donde todas las variables cumplan los requisitos indicado (por ejemplo, una entropía superior a un cierto umbral).*
+
+#### Select variables from dataframe based on rules and metrics
+
+```{r Filtering_of_variables__select_variables_by_metrics__function_demos_1}}
+
+kable(dataset_metrics_summary(std_mixed_df, append_input=TRUE), caption='Example numeric dataframe with metrics\\label{tab:filtering_of_variables__numeric_nrmn_stdn_df}')
+```
+
+##### filter dataframe for variance <= 0.71
+
+```{r Filtering_of_variables__select_variables_by_metrics__function_demos_2}}
+
+rules <- list( list('variance', '<=', 0.71) )
+variance_filtered_df <- select_variables_by_metrics(std_mixed_df,rules)
+kable(variance_filtered_df, caption='Filtered dataframe for variance <= 0.71\\label{tab:filtering_of_variables__select_variables_by_metrics_variance}')
+```
+
+##### filter dataframe for entropy >= 0.91
+
+```{r Filtering_of_variables__select_variables_by_metrics__function_demos_3}}
+
+rules <- list( list('entropy', '>=', 0.9) )
+entropy_filtered_df <- select_variables_by_metrics(std_mixed_df,rules)
+kable(entropy_filtered_df, caption='Filtered dataframe for entropy >= 0.91\\label{tab:filtering_of_variables__select_variables_by_metrics_entropy}')
+```
+
+### Calculation of the correlation/mutual information
+
+*Cálculo de la correlación (información mutua en el caso de variables categóricas) por pares entre variables de un dataset. La función deberá considerar de que tipo es cada variable*
+
+#### Correlation calculation, vector version
+
+##### Testing on a known dataset with correlation -0.685 between x and y
+
+```{r Correlation_mutual_info__correlation_demos1}
+
+x <- corr_m0p685_df$x
+y <- corr_m0p685_df$y
+corr <- correlation(x, y)
+```
+
+##### Testing on a identical vectors
+
+```{r Correlation_mutual_info__correlation_demos2}
+
+x <- corr_m0p685_df$x
+correlation(x, x)
+```
+
+
+####  Mutual information calculation, vector version
+
+##### Testing mutual_information() with vectors from c() and dataframe
+
+```{r Correlation_mutual_info__mutual_information_demos}
+
+#### Testing mutual_information() with vectors from c()
+x <- c("Red", "Blue", "Green", "Red", "Blue")
+y <- c("Circle", "Square", "Triangle", "Square", "Circle")
+mutual_information(x, y)
+
+#### Testing mutual_information() with vectors from dataframe
+df <- data.frame(
+    colors = c("Red", "Blue", "Green", "Red", "Blue"),
+    shapes = c("Circle", "Square", "Triangle", "Square", "Circle")
+)
+mutual_information(df$colors, df$shapes)
+
+#### Testing mutual_information() with longer vectors from c()
+x <- c("A", "B", "A", "A", "B", "B", "A", "A", "B", "B")
+y <- c("X", "X", "X", "Y", "Z", "Z", "Y", "Y", "Z", "Z")
+mutual_information(x, y)
+
+#### Testing mutual_information() with identical inputs from c()
+x <- c("A", "B", "A", "A", "B", "B", "A", "A", "B", "B")
+y <- c("A", "B", "A", "A", "B", "B", "A", "A", "B", "B")
+mutual_information(x, y)
+
+#### Testing mutual_information() with example data from the HMS Titanic disaster
+mutual_information(titanic_df$Sex, titanic_df$Condition)
+
+kable(head(titanic_df), caption='A few passengers from the Titanic dataset\\label{tab:Correlation_mutual_info__mutual_information_titanic}')
+```
+
+#### Relationships with correlation and mutual information, dataframe version
+
+##### Testing column_relationships() with example data from the HMS Titanic disaster as dataframe
+
+```{r Correlation_mutual_info__column_relationships__function_demos_1}
+
+kable(head(titanic_df), caption='A few passengers from the Titanic dataset\\label{tab:Correlation_mutual_info__column_relationships_titanic}')
+```
+
+##### column_relationships, Correlation between numeric variables
+
+```{r Correlation_mutual_info__column_relationships__function_demos_2}
+result <- column_relationships(titanic_df)
+correlation_df <- result$correlation_df
+association_df <- result$association_df
+kable(correlation_df, caption='Correlation between numeric variables of the Titanic dataset\\label{tab:Correlation_mutual_info__column_relationships_titanic_correlation}')
+```
+
+##### column_relationships, Correlation between categorical variables
+
+```{r Correlation_mutual_info__column_relationships__function_demos_3}
+
+kable(association_df, caption='Association (mutual information) between categorical variables of the Titanic dataset\\label{tab:Correlation_mutual_info__column_relationships_titanic_mutinfo}')
+```
+
+##### standard mixed dataframe
+
+```{r Correlation_mutual_info__column_relationships__function_demos_4}
+
+kable(std_mixed_df, caption='Standard mixed dataframe\\label{tab:Correlation_mutual_info__column_relationships_std_mixed}')
+```
+
+##### column_relationships, Correlation between numeric variables
+
+```{r Correlation_mutual_info__column_relationships__function_demos_5}
+
+result <- column_relationships(std_mixed_df)
+correlation_df <- result$correlation_df
+association_df <- result$association_df
+kable(correlation_df, caption='Correlation between numeric variables of the standard mixed dataframe\\label{tab:Correlation_mutual_info__column_relationships_std_mixed_correlation}')
+```
+
+##### column_relationships, Correlation between categorical variables
+
+```{r Correlation_mutual_info__column_relationships__function_demos_6}
+
+kable(association_df, caption='Association (mutual information) between categorical variables of the standard mixed dataframe\\label{tab:Correlation_mutual_info__column_relationships_std_mixed_mutinfo}')
+```  
+
+### Plots for the AUC and correlation/mutual information matrices
+
+*Plots para el AUC y para las matrices de correlación/información mutua.*
+
+#### Plot ROC (receiver operating characteristic) curve and display AUC
+
+```{r Plots_for_ROC_demo, fig.pos='H!', fig.width=6, fig.height=3, fig.align='center'}
+
+#### Testing plot_roc_auc() with ROC AUC curve, auc_1p0_df dataset
+roc_result <- calculate_roc_auc(auc_1p0_df)
+ROC_fpr <- roc_result$fpr
+ROC_tpr <- roc_result$tpr
+AUC <- roc_result$auc
+plot_roc_auc(ROC_fpr, ROC_tpr, AUC)
+
+#### Testing plot_roc_auc() with ROC AUC curve, auc_0p75_df dataset
+roc_result <- calculate_roc_auc(auc_0p75_df)
+ROC_fpr <- roc_result$fpr
+ROC_tpr <- roc_result$tpr
+AUC <- roc_result$auc
+plot_roc_auc(ROC_fpr, ROC_tpr, AUC)
+```
+
+#### Visualizing relationships with correlation and/or mutual information
+
+```{r Plot_relationships, fig.pos='H!', fig.width=6, fig.height=3, fig.align='center'}
+
+#### Testing plot_relationships() with dataset from the HMS Titanic
+result <- column_relationships(titanic_df)
+correlation_df <- result$correlation
+mutual_information_df <- result$association_df
+plot_relationships(mutual_information_df, 
+                   title='Mutual information in the HMS Titanic dataset')
+
+
+#### Testing plot_relationships() with standard mixed dataframe
+result <- column_relationships(std_mixed_df)
+correlation_df <- result$correlation
+mutual_information_df <- result$association_df
+
+plot_relationships(correlation_df, 
+                   title='Correlation in the standard mixed dataframe')
+plot_relationships(mutual_information_df, 
+                   title='Mutual information in the standard mixed dataframe')
+```
