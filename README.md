@@ -13,7 +13,7 @@ devtools::install_github("kevin137/somaes_r/somaes", build_vignettes=TRUE)
 
 ```R
 # In the RStudio console
-ilibrary(somaes)
+library(somaes)
 browseVignettes("somaes")
 ```
 
