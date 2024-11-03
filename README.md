@@ -3,12 +3,17 @@ R libraries developed for Software matemático y estadístico, Fall 2024
 
 ## Installation
 
-```bash
+*Note that devtools must be installed*
 
+```R
+devtools::install_github("kevin137/somaes_r/somaes", build_vignettes=TRUE)
 ```
 
 ## Usage
 
-```bash
-
+```R
+# In the RStudio console
+ilibrary(somaes)
+browseVignettes("somaes")
 ```
+
